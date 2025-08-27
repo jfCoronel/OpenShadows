@@ -1,0 +1,17 @@
+[project]
+name = "openshadows"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "jfCoronel", email = "jfc@us.es" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.3.2",
+    "shapely>=2.1.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.9.0"]
+build-backend = "uv_build"
