@@ -1,9 +1,11 @@
 import math
 import numpy as np
 from shapely.geometry import Polygon
+import pyvista
+from triangle import triangulate
 
 class Polygon_3D():
-    def __init__(self, origin, azimuth, altitude, polygon2D, holes2D=[]):
+    def __init__(self, origin, azimuth, altitude, polygon2D, holes2D=[], color="white", opacity=1.0):
         self.origin = np.array(origin)
         self.azimuth = azimuth
         self.altitude = altitude
@@ -18,14 +20,16 @@ class Polygon_3D():
                                 math.sin(self.azimuth_rad),
                                 0))
         self.y_axis = np.cross(self.normal_vector, self.x_axis)
-        self.polygon3D = self.convert_2D_to_3D(self.polygon2D)
+        self.polygon3D = self._convert_2D_to_3D_(self.polygon2D)
         self.holes2D = holes2D
         self.holes3D = []
         for hole in self.holes2D:
-            self.holes3D.append(self.convert_2D_to_3D(hole))
+            self.holes3D.append(self._convert_2D_to_3D_(hole))
         self.shapely_polygon = Polygon(self.polygon2D, self.holes2D)
         self.area = self.shapely_polygon.area
         self.equation_d = np.sum(self.normal_vector*self.origin)
+        self.color = color
+        self.opacity = opacity
 
     def has_holes(self):
         if (len(self.holes2D) > 0):
@@ -33,9 +37,9 @@ class Polygon_3D():
         else:
             return False
 
-    def is_coplanar(self, polygon):
-        if np.allclose(self.normal_vector, polygon.normal_vector):  # same normal verctor
-            if np.isclose(np.sum(self.normal_vector*polygon.origin), self.equation_d):  # in the plane
+    def is_coplanar(self, polygon_3D):
+        if np.allclose(self.normal_vector, polygon_3D.normal_vector):  # same normal verctor
+            if np.isclose(np.sum(self.normal_vector*polygon_3D.origin), self.equation_d):  # in the plane
                 return True
             else:
                 return False
@@ -48,7 +52,7 @@ class Polygon_3D():
                               self.altitude, self.polygon2D, self.holes2D)
         return advanced
 
-    def convert_2D_to_3D(self, pol_2D):
+    def _convert_2D_to_3D_(self, pol_2D):
         pol_3D = []
         for vertex in pol_2D:
             v_loc = (self.origin[0] + vertex[0] * math.cos(self.azimuth_rad)
@@ -92,8 +96,7 @@ class Polygon_3D():
         # Triangulate needs to know a single interior point for each hole
         holes = np.array([np.mean(h, axis=0) for h in self.holes2D])
         # Because triangulate is a wrapper around a C library the syntax is a little weird, 'p' here means planar straight line graph
-        d = triangulate(
-            dict(vertices=verts, segments=edges, holes=holes), opts='p')
+        d = triangulate(dict(vertices=verts, segments=edges, holes=holes), opts='p')
 
         # Convert back to pyvista
         v, f = d['vertices'], d['triangles']
@@ -101,7 +104,7 @@ class Polygon_3D():
         points = np.concatenate([v, np.zeros((nv, 1))], axis=1)
         # Creo que lo tengo que hacer en 2D y luego pasarlo a 3D
         faces = np.concatenate([np.full((nf, 1), 3), f], axis=1).reshape(-1)
-        return (self.convert_2D_to_3D(points), faces)
+        return (self._convert_2D_to_3D_(points), faces)
 
     def get_pyvista_polygon_border(self):
         return np.vstack([np.array(self.polygon3D), self.polygon3D[0]])
