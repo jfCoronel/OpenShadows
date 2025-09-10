@@ -5,7 +5,8 @@ import pyvista
 from triangle import triangulate
 
 class Polygon_3D():
-    def __init__(self, origin, azimuth, altitude, polygon2D, holes2D=[], color="white", opacity=1.0):
+    def __init__(self, name, origin, azimuth, altitude, polygon2D, holes2D=[], color="white", opacity=1.0, visible=True,shading=True,sunny=True):
+        self.name = name
         self.origin = np.array(origin)
         self.azimuth = azimuth
         self.altitude = altitude
@@ -30,6 +31,9 @@ class Polygon_3D():
         self.equation_d = np.sum(self.normal_vector*self.origin)
         self.color = color
         self.opacity = opacity
+        self.visible = visible
+        self.shading = shading
+        self.sunny = sunny
 
     def has_holes(self):
         if (len(self.holes2D) > 0):
@@ -37,7 +41,7 @@ class Polygon_3D():
         else:
             return False
 
-    def is_coplanar(self, polygon_3D):
+    def are_coplanar(self, polygon_3D):
         if np.allclose(self.normal_vector, polygon_3D.normal_vector):  # same normal verctor
             if np.isclose(np.sum(self.normal_vector*polygon_3D.origin), self.equation_d):  # in the plane
                 return True
@@ -45,13 +49,7 @@ class Polygon_3D():
                 return False
         else:
             return False
-
-    def get_advanced_polygon(self):
-        advanced_origin = self.origin + self.normal_vector*1e-4
-        advanced = Polygon_3D(advanced_origin, self.azimuth,
-                              self.altitude, self.polygon2D, self.holes2D)
-        return advanced
-
+    
     def _convert_2D_to_3D_(self, pol_2D):
         pol_3D = []
         for vertex in pol_2D:
@@ -64,14 +62,8 @@ class Polygon_3D():
                      self.origin[2] + vertex[1] * math.cos(self.altitude_rad))
             pol_3D.append(v_loc)
         return pol_3D
-
-    def is_facing_sun(self, sun_position):
-        escalar_p = np.sum(self.normal_vector*sun_position)
-        if escalar_p >= 1e-10:
-            return True
-        else:
-            return False
-
+        
+    # Functions for pyvista
     def get_pyvista_mesh(self):
         if self.has_holes():
             (points, faces) = self._triangulate_()
@@ -112,16 +104,26 @@ class Polygon_3D():
     def get_pyvista_hole_border(self, i):
         return np.vstack([np.array(self.holes3D[i]), self.holes3D[i][0]])
 
-    def get_sunny_shapely_polygon(self, shadow_polygons_list, sun_position):
+
+    # Shadow calculations
+    def is_facing_sun(self, sun_position):
+        escalar_p = np.sum(self.normal_vector*sun_position)
+        if escalar_p >= 1e-10:
+            return True
+        else:
+            return False
+
+    def _get_sunny_shapely_polygon_(self, environment_3D, sun_position):
         if not self.is_facing_sun(sun_position):
             return None
         else:
             # Calculate projected shadows
             shadows_2D = []
-            for shadow_polygon in shadow_polygons_list:
-                if shadow_polygon.is_facing_sun(sun_position):
-                    shadows_2D.append(self._calculate_shapely_2D_projected_(
-                        shadow_polygon, sun_position))
+            for shadow_polygon in environment_3D.pol_3D:
+                if shadow_polygon != self and shadow_polygon.shading == True:
+                    if shadow_polygon.is_facing_sun(sun_position):
+                        shadows_2D.append(self._calculate_shapely_projected_polygon_(shadow_polygon, sun_position))
+
             # Calculate sunny polygon
             sunny_polygon = self.shapely_polygon
             for shadow_polygon in shadows_2D:
@@ -131,26 +133,24 @@ class Polygon_3D():
                 sunny_polygon = None
             return sunny_polygon
 
-    def get_sunny_polygon3D(self, shadow_polygons_list, sun_position):
-        return self._shapely_multipolygon_to_polygons_3D_(self.get_sunny_shapely_polygon(shadow_polygons_list, sun_position))
-
-    def get_shadow_shapely_polygon(self, shadow_polygons_list, sun_position):
-        sunny_polygon = self.get_sunny_shapely_polygon(
-            shadow_polygons_list, sun_position)
-        if sunny_polygon == None:
-            return self.shapely_polygon
-        else:
-            shadow_polygon = self.shapely_polygon.difference(sunny_polygon)
-            if shadow_polygon.is_empty:
-                return None
+    def _calculate_shapely_projected_polygon_(self, polygon_to_project, sun_position):
+        exterior_points = self._get_projected_points_(polygon_to_project, sun_position)
+        if exterior_points != None:
+            if polygon_to_project.has_holes():
+                holes = []
+                for hole in polygon_to_project.holes3D:
+                    hole_points = self._get_projected_points_(
+                        Polygon_3D(polygon_to_project.origin, polygon_to_project.azimuth, polygon_to_project.altitude, hole), sun_position)
+                    if hole_points != None:
+                        holes.append(hole_points)
+                return Polygon(exterior_points, holes)
             else:
-                return shadow_polygon
+                return Polygon(exterior_points)
+        else:
+            return None
 
-    def get_shadow_polygon3D(self, shadow_polygons_list, sun_position):
-        return self._shapely_multipolygon_to_polygons_3D_(self.get_shadow_shapely_polygon(shadow_polygons_list, sun_position))
-
-    def _calculate_shapely_2D_projected_(self, polygon_to_project, sun_position):
-        projected_polygon = []
+    def _get_projected_points_(self,polygon_to_project, sun_position):
+        projected_points = []
         n_points = 0
         k_total = 0
         for point in polygon_to_project.polygon3D:
@@ -160,16 +160,19 @@ class Polygon_3D():
             vector = projected_point_3D - self.origin
             projected_point_2D = np.array(
                 [np.sum(self.x_axis*vector), np.sum(self.y_axis*vector)])
-            projected_polygon.append(projected_point_2D)
+            projected_points.append(projected_point_2D)
             if (k > -1e-6):  # Por delante o en el plano
                 n_points += 1
             if (k > 0.1):  # 10 cm
                 k_total += k
         # TODO: que ocurre cuando tengo planos cortantes ...
         if n_points > 2 and k_total > 0.1:
-            return Polygon(projected_polygon)
+            return projected_points
         else:
             return None
+
+    def get_sunny_polygon3D(self, environment_3D, sun_position):
+        return self._shapely_multipolygon_to_polygons_3D_(self._get_sunny_shapely_polygon_(environment_3D, sun_position))
 
     # Para dibujarlos en 3D
     def _shapely_multipolygon_to_polygons_3D_(self, shapely_polygon):
@@ -187,4 +190,32 @@ class Polygon_3D():
     def _shapely_to_polygon_3D_(self, shapely_pol):
         exterior_pol = np.asarray(shapely_pol.exterior.coords)
         holes = [(np.asarray(ring.coords)) for ring in shapely_pol.interiors]
-        return Polygon_3D(self.origin, self.azimuth, self.altitude, exterior_pol, holes)
+        sunny_pol = Polygon_3D(self.name+"_sunny",self.origin, self.azimuth, self.altitude, exterior_pol, holes)
+        # Adelantarlo un poco para que se vea el z-fighting
+        sunny_pol.origin = self.origin + self.normal_vector*1e-4
+        return sunny_pol
+
+
+    
+    #def get_advanced_polygon(self):
+    #    advanced_origin = self.origin + self.normal_vector*1e-4
+    #    advanced = Polygon_3D(advanced_origin, self.azimuth,
+    #                          self.altitude, self.polygon2D, self.holes2D)
+    #    return advanced
+
+    # def get_shadow_shapely_polygon(self, shadow_polygons_list, sun_position):
+    #     sunny_polygon = self._get_sunny_shapely_polygon_(
+    #         shadow_polygons_list, sun_position)
+    #     if sunny_polygon == None:
+    #         return self.shapely_polygon
+    #     else:
+    #         shadow_polygon = self.shapely_polygon.difference(sunny_polygon)
+    #         if shadow_polygon.is_empty:
+    #             return None
+    #         else:
+    #             return shadow_polygon
+
+    # def get_shadow_polygon3D(self, shadow_polygons_list, sun_position):
+    #     return self._shapely_multipolygon_to_polygons_3D_(self.get_shadow_shapely_polygon(shadow_polygons_list, sun_position))
+
+
