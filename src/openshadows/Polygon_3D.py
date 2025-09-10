@@ -113,9 +113,10 @@ class Polygon_3D():
         else:
             return False
 
-    def _get_sunny_shapely_polygon_(self, environment_3D, sun_position):
+    def _get_sunny_shadow_shapely_polygon_(self, environment_3D, sun_position):
         if not self.is_facing_sun(sun_position):
-            return None
+            sunny_polygon = None
+            shadow_polygon = self.shapely_polygon
         else:
             # Calculate projected shadows
             shadows_2D = []
@@ -131,7 +132,12 @@ class Polygon_3D():
                     sunny_polygon = sunny_polygon.difference(shadow_polygon)
             if sunny_polygon.is_empty:
                 sunny_polygon = None
-            return sunny_polygon
+                shadow_polygon = self.shapely_polygon
+            else:
+                shadow_polygon = self.shapely_polygon.difference(sunny_polygon)
+                if shadow_polygon.is_empty:
+                    shadow_polygon = None
+        return sunny_polygon, shadow_polygon
 
     def _calculate_shapely_projected_polygon_(self, polygon_to_project, sun_position):
         exterior_points = self._get_projected_points_(polygon_to_project, sun_position)
@@ -171,29 +177,35 @@ class Polygon_3D():
         else:
             return None
 
-    def get_sunny_polygon3D(self, environment_3D, sun_position):
-        return self._shapely_multipolygon_to_polygons_3D_(self._get_sunny_shapely_polygon_(environment_3D, sun_position))
-
+    def get_sunny_shadow_polygon3D(self, environment_3D, sun_position):
+        sunny_polygons, shadow_polygons = self._get_sunny_shadow_shapely_polygon_(environment_3D, sun_position)
+        sunny_polygons_3D = self._shapely_multipolygon_to_polygons_3D_(sunny_polygons,"sunny")
+        shadow_polygons_3D = self._shapely_multipolygon_to_polygons_3D_(shadow_polygons,"shadow")
+        return sunny_polygons_3D, shadow_polygons_3D
+    
     # Para dibujarlos en 3D
-    def _shapely_multipolygon_to_polygons_3D_(self, shapely_polygon):
+    def _shapely_multipolygon_to_polygons_3D_(self, shapely_polygon, type="sunny"):
         polygon_list = []
         if shapely_polygon != None:
             if shapely_polygon.geom_type == 'MultiPolygon':
                 polygons = list(shapely_polygon.geoms)
                 for pol in polygons:
-                    polygon_list.append(self._shapely_to_polygon_3D_(pol))
+                    polygon_list.append(self._shapely_to_polygon_3D_(pol,type))
             elif shapely_polygon.geom_type == 'Polygon':
                 polygon_list.append(
-                    self._shapely_to_polygon_3D_(shapely_polygon))
+                    self._shapely_to_polygon_3D_(shapely_polygon,type))
         return polygon_list
 
-    def _shapely_to_polygon_3D_(self, shapely_pol):
+    def _shapely_to_polygon_3D_(self, shapely_pol, type="sunny"):
         exterior_pol = np.asarray(shapely_pol.exterior.coords)
         holes = [(np.asarray(ring.coords)) for ring in shapely_pol.interiors]
-        sunny_pol = Polygon_3D(self.name+"_sunny",self.origin, self.azimuth, self.altitude, exterior_pol, holes)
-        # Adelantarlo un poco para que se vea el z-fighting
-        sunny_pol.origin = self.origin + self.normal_vector*1e-4
-        return sunny_pol
+        if type=="sunny":
+            pol_3D = Polygon_3D(self.name+"_sunny",self.origin, self.azimuth, self.altitude, exterior_pol, holes,color=self.color,opacity=self.opacity)
+        else:
+            pol_3D = Polygon_3D(self.name+"_shadow",self.origin, self.azimuth, self.altitude, exterior_pol, holes, color="gray")
+            # Adelantarlo un poco para que se vea el z-fighting
+            pol_3D.origin = self.origin + self.normal_vector*1e-3
+        return pol_3D
 
 
     

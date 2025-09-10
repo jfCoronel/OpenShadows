@@ -4,25 +4,46 @@ class Environment_3D():
     def __init__(self):
         self.pol_3D = []
         self.pol_sunny = []
+        self.pol_shadows = []
         self.sunny_fraction = []
 
     def add_polygon_3D(self, polygon_3D):
         self.pol_3D.append(polygon_3D)
         self.sunny_fraction.append(1.0)
 
-    def show(self, window=False):
+    def show(self, polygons_type="initial", window=False):
         pyvista = Pyvista_Screen(window=window)
-        for polygon_3D in self.pol_3D:
-            if polygon_3D.visible:
-                pyvista.add_polygon(polygon_3D)
-        pyvista.show()
+        if polygons_type == "initial":
+            for polygon_3D in self.pol_3D:
+                if polygon_3D.visible:
+                    pyvista.add_polygon(polygon_3D)
+        elif polygons_type == "sunny":
+            for polygon_3D in self.pol_sunny:
+                    pyvista.add_polygon(polygon_3D)
+        elif polygons_type == "shadows":
+            for polygon_3D in self.pol_shadows:
+                    pyvista.add_polygon(polygon_3D)
+        elif polygons_type == "initial+shadows":
+            for polygon_3D in self.pol_3D:
+                if polygon_3D.visible:
+                    pyvista.add_polygon(polygon_3D)
+            for polygon_3D in self.pol_shadows:
+                    pyvista.add_polygon(polygon_3D)
+        elif polygons_type == "sunny+shadows":
+            for polygon_3D in self.pol_sunny:
+                    pyvista.add_polygon(polygon_3D)
+            for polygon_3D in self.pol_shadows:
+                    pyvista.add_polygon(polygon_3D)
+        
+        pyvista.show()    
+
     
     def calculate_shadows(self, sun_position):
         self.pol_sunny = []
         self.sunny_fraction = []
         for polygon in self.pol_3D:
             if polygon.sunny == True:
-                sunny_polygons = polygon.get_sunny_polygon3D(self, sun_position)
+                sunny_polygons, shadow_polygons = polygon.get_sunny_shadow_polygon3D(self, sun_position)
                 if sunny_polygons != None:
                     sunny_area = 0
                     for sunny_polygon in sunny_polygons:
@@ -31,6 +52,9 @@ class Environment_3D():
                     self.sunny_fraction.append(sunny_area/polygon.area)
                 else:
                     self.sunny_fraction.append(0)  # No sunny area
+                if shadow_polygons != None:
+                    for shadow_polygon in shadow_polygons:
+                        self.pol_shadows.append(shadow_polygon)
             else:
                 self.sunny_fraction.append(float('nan'))
 
@@ -49,7 +73,7 @@ class Pyvista_Screen():
             pyvista.set_jupyter_backend("trame")
             self.plot = pyvista.Plotter(notebook=True)
             self.plot.add_axes_at_origin()
-        #self.plot.show_grid()
+
 
     def click_callback(self, mesh): 
         if self.text_actor:
@@ -57,7 +81,7 @@ class Pyvista_Screen():
         name = mesh.field_data["name"]
         self.text_actor = self.plot.add_text(name)
         print("Clicked on: ", name)
-        #print(mesh)
+
     
     def add_polygon(self, polygon_3D):
         mesh = polygon_3D.get_pyvista_mesh().triangulate()
