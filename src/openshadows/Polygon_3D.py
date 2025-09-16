@@ -5,7 +5,7 @@ import pyvista
 from triangle import triangulate
 
 class Polygon_3D():
-    def __init__(self, name, origin, azimuth, altitude, polygon2D, holes2D=[], color="white", opacity=1.0, visible=True,shading=True,sunny=True):
+    def __init__(self, name, origin, azimuth, altitude, polygon2D, holes2D=[], color="white", opacity=1.0, visible=True,shading=True,calculate_shadows=True):
         self.name = name
         self.origin = np.array(origin)
         self.azimuth = azimuth
@@ -28,12 +28,14 @@ class Polygon_3D():
             self.holes3D.append(self._convert_2D_to_3D_(hole))
         self.shapely_polygon = Polygon(self.polygon2D, self.holes2D)
         self.area = self.shapely_polygon.area
+        self.centroid2D = self.shapely_polygon.centroid.coords[0]
+        self.centroid3D = self._convert_2D_to_3D_([self.centroid2D])[0]
         self.equation_d = np.sum(self.normal_vector*self.origin)
         self.color = color
         self.opacity = opacity
         self.visible = visible
         self.shading = shading
-        self.sunny = sunny
+        self.calculate_shadows = calculate_shadows
 
     def has_holes(self):
         if (len(self.holes2D) > 0):
@@ -53,13 +55,13 @@ class Polygon_3D():
     def _convert_2D_to_3D_(self, pol_2D):
         pol_3D = []
         for vertex in pol_2D:
-            v_loc = (self.origin[0] + vertex[0] * math.cos(self.azimuth_rad)
+            v_loc = np.array([self.origin[0] + vertex[0] * math.cos(self.azimuth_rad)
                      - vertex[1] * math.sin(self.altitude_rad) *
                      math.sin(self.azimuth_rad),
                      self.origin[1] + vertex[0] * math.sin(self.azimuth_rad)
                      + vertex[1] * math.sin(self.altitude_rad) *
                      math.cos(self.azimuth_rad),
-                     self.origin[2] + vertex[1] * math.cos(self.altitude_rad))
+                     self.origin[2] + vertex[1] * math.cos(self.altitude_rad)])
             pol_3D.append(v_loc)
         return pol_3D
         
@@ -123,7 +125,10 @@ class Polygon_3D():
             for shadow_polygon in environment_3D.pol_3D:
                 if shadow_polygon != self and shadow_polygon.shading == True:
                     if shadow_polygon.is_facing_sun(sun_position):
-                        shadows_2D.append(self._calculate_shapely_projected_polygon_(shadow_polygon, sun_position))
+                        if not self.are_coplanar(shadow_polygon):
+                            # if shadow is near to sun
+                            if self.is_near_to_sun(shadow_polygon, sun_position):
+                                shadows_2D.append(self._calculate_shapely_projected_polygon_(shadow_polygon, sun_position))
 
             # Calculate sunny polygon
             sunny_polygon = self.shapely_polygon
@@ -138,6 +143,14 @@ class Polygon_3D():
                 if shadow_polygon.is_empty:
                     shadow_polygon = None
         return sunny_polygon, shadow_polygon
+    
+    def is_near_to_sun(self, polygon_3D, sun_position):
+        vector_3D = polygon_3D.centroid3D - self.centroid3D
+        escalar_p = np.sum(vector_3D*sun_position)
+        if escalar_p > 1e-6:  # Por delante 
+            return True
+        else:
+            return False
 
     def _calculate_shapely_projected_polygon_(self, polygon_to_project, sun_position):
         exterior_points = self._get_projected_points_(polygon_to_project, sun_position)
@@ -157,8 +170,7 @@ class Polygon_3D():
 
     def _get_projected_points_(self,polygon_to_project, sun_position):
         projected_points = []
-        n_points = 0
-        k_total = 0
+        algun_punto_delante = False
         for point in polygon_to_project.polygon3D:
             k = (np.sum(self.normal_vector * point)-self.equation_d) / \
                 (np.sum(self.normal_vector * sun_position))
@@ -167,12 +179,10 @@ class Polygon_3D():
             projected_point_2D = np.array(
                 [np.sum(self.x_axis*vector), np.sum(self.y_axis*vector)])
             projected_points.append(projected_point_2D)
-            if (k > -1e-6):  # Por delante o en el plano
-                n_points += 1
-            if (k > 0.1):  # 10 cm
-                k_total += k
+            if (k > 1e-6):  # Por delante 
+                algun_punto_delante = True
         # TODO: que ocurre cuando tengo planos cortantes ...
-        if n_points > 2 and k_total > 0.1:
+        if algun_punto_delante:
             return projected_points
         else:
             return None
@@ -198,13 +208,16 @@ class Polygon_3D():
 
     def _shapely_to_polygon_3D_(self, shapely_pol, type="sunny"):
         exterior_pol = np.asarray(shapely_pol.exterior.coords)
-        holes = [(np.asarray(ring.coords)) for ring in shapely_pol.interiors]
+        holes = []
+        for interior in shapely_pol.interiors:
+            interior_pol = np.asarray(interior.coords)
+            holes.append(interior_pol)
         if type=="sunny":
             pol_3D = Polygon_3D(self.name+"_sunny",self.origin, self.azimuth, self.altitude, exterior_pol, holes,color=self.color,opacity=self.opacity)
         else:
             pol_3D = Polygon_3D(self.name+"_shadow",self.origin, self.azimuth, self.altitude, exterior_pol, holes, color="gray")
             # Adelantarlo un poco para que se vea el z-fighting
-            pol_3D.origin = self.origin + self.normal_vector*1e-3
+            # pol_3D.origin = self.origin + self.normal_vector*1e-3
         return pol_3D
 
 

@@ -40,9 +40,11 @@ class Environment_3D():
     
     def calculate_shadows(self, sun_position):
         self.pol_sunny = []
+        self.pol_shadows = []
         self.sunny_fraction = []
+
         for polygon in self.pol_3D:
-            if polygon.sunny == True:
+            if polygon.calculate_shadows == True:
                 sunny_polygons, shadow_polygons = polygon.get_sunny_shadow_polygon3D(self, sun_position)
                 if sunny_polygons != None:
                     sunny_area = 0
