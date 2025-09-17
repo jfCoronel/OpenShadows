@@ -2,6 +2,7 @@ import math
 import numpy as np
 from shapely.geometry import Polygon
 import pyvista
+import vedo
 from triangle import triangulate
 
 class Polygon_3D():
@@ -74,6 +75,17 @@ class Polygon_3D():
             faces = [len(self.polygon3D), *range(0, len(self.polygon3D))]
             return pyvista.PolyData(np.array(self.polygon3D), faces)
 
+    # Functions for vedo
+    def get_vedo_mesh(self):
+        #if self.has_holes():
+        (points, faces) = self._triangulate_()
+        #else:
+        #    points = np.array(self.polygon3D)
+        #    faces = [np.array(range(0, len(self.polygon3D)))]
+        mesh = vedo.Mesh([points, faces])
+        mesh.c(self.color).alpha(self.opacity)
+        return mesh
+
     def _triangulate_(self):
         def edge_idxs(nv):
             i = np.append(np.arange(nv), 0)
@@ -90,15 +102,29 @@ class Polygon_3D():
         # Triangulate needs to know a single interior point for each hole
         holes = np.array([np.mean(h, axis=0) for h in self.holes2D])
         # Because triangulate is a wrapper around a C library the syntax is a little weird, 'p' here means planar straight line graph
-        d = triangulate(dict(vertices=verts, segments=edges, holes=holes), opts='p')
-
+        if self.has_holes():
+            d = triangulate(dict(vertices=verts, segments=edges, holes=holes), opts='p')
+        else:
+            d = triangulate(dict(vertices=verts, segments=edges), opts='p')
         # Convert back to pyvista
         v, f = d['vertices'], d['triangles']
         nv, nf = len(v), len(f)
         points = np.concatenate([v, np.zeros((nv, 1))], axis=1)
         # Creo que lo tengo que hacer en 2D y luego pasarlo a 3D
-        faces = np.concatenate([np.full((nf, 1), 3), f], axis=1).reshape(-1)
-        return (self._convert_2D_to_3D_(points), faces)
+        #faces = np.concatenate([np.full((nf, 1), 3), f], axis=1).reshape(-1)
+        return (self._convert_2D_to_3D_(points), f)
+
+    def _are_vertices_counterclockwise_(self,puntos):
+        # Se suma el primer punto al final para cerrar el polígono.
+        if puntos[-1][0] != puntos[0][0] or puntos[-1][1] != puntos[0][1]:
+            puntos_cerrados = np.vstack([puntos, puntos[0]])
+        else:
+            puntos_cerrados = puntos
+        x = puntos_cerrados[:, 0]
+        y = puntos_cerrados[:, 1]
+        # La suma de los productos cruzados
+        suma_productos_cruzados = np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
+        return suma_productos_cruzados > 0
 
     def get_pyvista_polygon_border(self):
         return np.vstack([np.array(self.polygon3D), self.polygon3D[0]])
@@ -208,14 +234,22 @@ class Polygon_3D():
 
     def _shapely_to_polygon_3D_(self, shapely_pol, type="sunny"):
         exterior_pol = np.asarray(shapely_pol.exterior.coords)
+        if not self._are_vertices_counterclockwise_(exterior_pol):
+            exterior_pol = exterior_pol[::-1]
+        if exterior_pol[-1][0] == exterior_pol[0][0] and exterior_pol[-1][1] == exterior_pol[0][1]:
+            exterior_pol = exterior_pol[:-1]
         holes = []
         for interior in shapely_pol.interiors:
             interior_pol = np.asarray(interior.coords)
+            if not self._are_vertices_counterclockwise_(interior_pol):
+                interior_pol = interior_pol[::-1]
+            if interior_pol[-1][0] == interior_pol[0][0] and interior_pol[-1][1] == interior_pol[0][1]:
+                interior_pol = interior_pol[:-1]
             holes.append(interior_pol)
         if type=="sunny":
             pol_3D = Polygon_3D(self.name+"_sunny",self.origin, self.azimuth, self.altitude, exterior_pol, holes,color=self.color,opacity=self.opacity)
         else:
-            pol_3D = Polygon_3D(self.name+"_shadow",self.origin, self.azimuth, self.altitude, exterior_pol, holes, color="gray")
+            pol_3D = Polygon_3D(self.name+"_shadow",self.origin, self.azimuth, self.altitude, exterior_pol, holes, color="gray3")
             # Adelantarlo un poco para que se vea el z-fighting
             # pol_3D.origin = self.origin + self.normal_vector*1e-3
         return pol_3D

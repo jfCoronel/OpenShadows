@@ -1,4 +1,5 @@
 import pyvista
+import vedo
 
 class Environment_3D():
     def __init__(self):
@@ -37,7 +38,38 @@ class Environment_3D():
         
         pyvista.show()    
 
+    def show_vedo(self, polygons_type="initial"):
+        meshes = []
     
+        if polygons_type == "initial":
+            for polygon_3D in self.pol_3D:
+                if polygon_3D.visible:
+                    mesh = polygon_3D.get_vedo_mesh()
+                    meshes.append(mesh)
+                    meshes.append(mesh.silhouette('2d').c("black").linewidth(5))
+        elif polygons_type == "sunny":
+            for polygon_3D in self.pol_sunny:
+                    mesh = polygon_3D.get_vedo_mesh()
+                    meshes.append(mesh)
+                    meshes.append(mesh.silhouette('2d').c("black").linewidth(5))
+        elif polygons_type == "shadows":
+            for polygon_3D in self.pol_shadows:
+                    mesh = polygon_3D.get_vedo_mesh()
+                    meshes.append(mesh)
+                    meshes.append(mesh.silhouette('2d').c("black").linewidth(5))
+        elif polygons_type == "sunny+shadows":
+            for polygon_3D in self.pol_sunny:
+                    mesh = polygon_3D.get_vedo_mesh()
+                    meshes.append(mesh)
+                    meshes.append(mesh.silhouette('2d').c("black").linewidth(5))
+            for polygon_3D in self.pol_shadows:
+                    mesh = polygon_3D.get_vedo_mesh()
+                    meshes.append(mesh)
+                    meshes.append(mesh.silhouette('2d').c("black").linewidth(5))
+
+        vedo.show(*meshes,"vedo window", axes=1, viewup="z").close()
+
+
     def calculate_shadows(self, sun_position):
         self.pol_sunny = []
         self.pol_shadows = []

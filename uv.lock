@@ -1330,6 +1330,7 @@ dependencies = [
     { name = "pyvista", extra = ["all"] },
     { name = "shapely" },
     { name = "triangle" },
+    { name = "vedo" },
 ]
 
 [package.metadata]
@@ -1338,6 +1339,7 @@ requires-dist = [
     { name = "pyvista", extras = ["all"], specifier = ">=0.46.3" },
     { name = "shapely", specifier = ">=2.1.1" },
     { name = "triangle", specifier = ">=20250106" },
+    { name = "vedo", specifier = ">=2025.5.4" },
 ]
 
 [[package]]
@@ -2184,6 +2186,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/15/22/9ee70a2574a4f4599c47dd506532914ce044817c7752a79b6a51286319bc/urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760", size = 393185, upload-time = "2025-06-18T14:07:41.644Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc", size = 129795, upload-time = "2025-06-18T14:07:40.39Z" },
+]
+
+[[package]]
+name = "vedo"
+version = "2025.5.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pygments" },
+    { name = "typing-extensions" },
+    { name = "vtk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/74/cb/15d78ab5930ea09664f9834645372bca4963c78510be422df812804f72de/vedo-2025.5.4.tar.gz", hash = "sha256:feb585782b99f44f8d2890e689418d593bdeefc2f8c58a80aa2d9ec3a39253a4", size = 2714801, upload-time = "2025-06-10T10:48:57.803Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/cb/59ae2781a91ba8cf8c1860af7d7164dd7ce3a59ab46032cbf33a150dd591/vedo-2025.5.4-py3-none-any.whl", hash = "sha256:929328886304aeadd64ef80bba39306a49fb1fa9df1628f231fbf0edeedd420e", size = 2833510, upload-time = "2025-06-10T10:48:54.206Z" },
 ]
 
 [[package]]
