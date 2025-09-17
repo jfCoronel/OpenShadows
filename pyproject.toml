@@ -1,5 +1,5 @@
 [project]
-name = "openshadows"
+name = "OpenShadows"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,7 +9,6 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.3.2",
-    "pyvista[all]>=0.46.3",
     "shapely>=2.1.1",
     "triangle>=20250106",
     "vedo>=2025.5.4",

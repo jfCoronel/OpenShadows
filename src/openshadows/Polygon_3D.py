@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from shapely.geometry import Polygon
-import pyvista
+#import pyvista
 import vedo
 from triangle import triangulate
 
@@ -67,13 +67,13 @@ class Polygon_3D():
         return pol_3D
         
     # Functions for pyvista
-    def get_pyvista_mesh(self):
-        if self.has_holes():
-            (points, faces) = self._triangulate_()
-            return pyvista.PolyData(points, faces=faces)
-        else:
-            faces = [len(self.polygon3D), *range(0, len(self.polygon3D))]
-            return pyvista.PolyData(np.array(self.polygon3D), faces)
+    # def get_pyvista_mesh(self):
+    #     if self.has_holes():
+    #         (points, faces) = self._triangulate_()
+    #         return pyvista.PolyData(points, faces=faces)
+    #     else:
+    #         faces = [len(self.polygon3D), *range(0, len(self.polygon3D))]
+    #         return pyvista.PolyData(np.array(self.polygon3D), faces)
 
     # Functions for vedo
     def get_vedo_mesh(self):
@@ -106,7 +106,7 @@ class Polygon_3D():
             d = triangulate(dict(vertices=verts, segments=edges, holes=holes), opts='p')
         else:
             d = triangulate(dict(vertices=verts, segments=edges), opts='p')
-        # Convert back to pyvista
+        # Convert back 
         v, f = d['vertices'], d['triangles']
         nv, nf = len(v), len(f)
         points = np.concatenate([v, np.zeros((nv, 1))], axis=1)
@@ -126,11 +126,11 @@ class Polygon_3D():
         suma_productos_cruzados = np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
         return suma_productos_cruzados > 0
 
-    def get_pyvista_polygon_border(self):
-        return np.vstack([np.array(self.polygon3D), self.polygon3D[0]])
+    # def get_pyvista_polygon_border(self):
+    #     return np.vstack([np.array(self.polygon3D), self.polygon3D[0]])
 
-    def get_pyvista_hole_border(self, i):
-        return np.vstack([np.array(self.holes3D[i]), self.holes3D[i][0]])
+    # def get_pyvista_hole_border(self, i):
+    #     return np.vstack([np.array(self.holes3D[i]), self.holes3D[i][0]])
 
 
     # Shadow calculations
